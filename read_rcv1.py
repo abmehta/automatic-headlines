@@ -10,9 +10,9 @@ DATA_DIR = "data"
 RCV1_DIR = os.path.join(DATA_DIR, "rcv1")
 
 
-NUM_TRAIN_DAILY = 10
-NUM_VAL_DAILY = 5
-NUM_TEST_DAILY = 5
+NUM_TRAIN_DAILY = 100
+NUM_VAL_DAILY = 50
+NUM_TEST_DAILY = 50
 # 365 is number of article directories, one for each day
 NUM_TRAIN = 365 * NUM_TRAIN_DAILY # 36,500
 NUM_VAL = 365 * NUM_VAL_DAILY # 18,250
@@ -38,11 +38,9 @@ class RCV1_doc:
 
         self.text = [nltk.word_tokenize(sentence.text) for sentence in doc_root.find('text')]
 
-        #self.headline_pos = self.get_headline_pos()
-        #self.text_pos = self.get_text_pos()
-        #self.text_set = set([word for word, pos in self.text_pos]) # useful for idf scores
-
-        #self.article_length = len(self.text_pos)
+        self.headline_pos = self.get_headline_pos()
+        self.text_pos = self.get_text_pos()
+        self.text_set = set([word for word, pos in self.text_pos]) # useful for idf scores
 
 
     @staticmethod
@@ -94,7 +92,9 @@ class RCV1_doc:
 
 
     def get_local_feature(self, word_index):
-        assert word_index < self.article_length
+	# -1 added to remove list index out of range error - A
+	max_index = len(self.text_pos)-1
+        assert word_index <= max_index
 
         word, word_pos = self.text_pos[word_index]
         word_sentence = 0
@@ -103,7 +103,9 @@ class RCV1_doc:
             word_sentence += 1
             word_i -= len(self.text[word_sentence])
 
-        in_headline = word in self.headline_set
+	#modification by A        
+	bool_in_headline = word in self.headline_set
+	in_headline = 1.0 if bool_in_headline else 0.0
 
         local_feature = dict()
         local_feature[('currword', word)] = 1
@@ -117,7 +119,7 @@ class RCV1_doc:
 
         # word context is 2 before, and 2 after
         prev_word, prev_word_pos = self.text_pos[word_index-1] if word_index > 0 else (None, None)
-        post_word, post_word_pos = self.text_pos[word_index+1] if word_index < self.article_length-1 else (None, None)
+        post_word, post_word_pos = self.text_pos[word_index+1] if word_index < max_index else (None, None)
 
         local_feature[('pre_bigram', word, prev_word)] = 1
         local_feature[('post_bigram', word, post_word)] = 1
@@ -127,18 +129,10 @@ class RCV1_doc:
         return local_feature, in_headline
 
 
-    def get_all_features(self):
-
-        all_features = list()
-        for i in range(self.article_length):
-            feature_vec, outcome = self.get_local_feature(i)
-            all_features.append((feature_vec, outcome))
-
-        return all_features
 
 
 
-def get_split_data(split_path_file='data/train3650.split'):
+def get_split_data(split_path_file='data/train36500.split'):
 
 
     with open(split_path_file, 'r') as splits:
@@ -146,7 +140,7 @@ def get_split_data(split_path_file='data/train3650.split'):
 
 
     rcv1_articles = list()
-    tots = len(split_paths)
+    tots = 10 #len(split_paths)
     count = 0.
     for path in split_paths[:tots]:
             rcv1_articles.append(RCV1_doc(path))
@@ -245,6 +239,7 @@ if __name__ == "__main__":
     #create_training_splits()
     print "getting data"
     train_articles = get_split_data('data/val{size}.split'.format(size=NUM_VAL))
+    #print "train articles",train_articles
     print "data got"
 
     # text_vocab = Counter()
@@ -302,5 +297,4 @@ if __name__ == "__main__":
     # print date, article_paths[date][:1], "\n"
     # first_doc_last_day = RCV1_doc(article_paths[date][0])
     # print str(first_doc_last_day)
-
     # print len(first_doc_last_day.text)
